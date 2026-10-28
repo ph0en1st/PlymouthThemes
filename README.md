@@ -30,9 +30,16 @@ Preview: will be added later
 
 ---
 
+### 3. shadowusb-glint
+
+ShadowUSB: a stationary metallic hood on pure black with a soft diagonal glint.
+Includes reproducible assets and rootless Plymouth preview tools.
+See [theme documentation](shadowusb-glint/README.md).
+The ArchISO profile contains only the runtime files; generation is not a build step.
+
 ## Installation
 
-Both themes come with an automated installation script.
+The ASUS themes come with an automated installation script.
 
 ### Prerequisites
 

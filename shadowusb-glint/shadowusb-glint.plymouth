@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=ShadowUSB Glint
+Description=Stationary hood with a soft surface reflection
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/shadowusb-glint/assets
+ScriptFile=/usr/share/plymouth/themes/shadowusb-glint/shadowusb-glint.script

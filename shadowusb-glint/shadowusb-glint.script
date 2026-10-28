@@ -1,0 +1,131 @@
+# ShadowUSB: stationary logo, diagonal surface reflection, six-second cycle.
+Window.SetBackgroundTopColor(16/255,20/255,24/255);
+Window.SetBackgroundBottomColor(16/255,20/255,24/255);
+Plymouth.SetRefreshRate(30);
+fun min(a, b) { if (a < b) return a; return b; }
+fun max(a, b) { if (a > b) return a; return b; }
+fun scaled(image, factor) {
+    return image.Scale(max(1, Math.Int(image.GetWidth()*factor)), max(1, Math.Int(image.GetHeight()*factor)));
+}
+fun place(sprite, image, x, y, z) {
+    sprite.SetImage(image);
+    sprite.SetPosition(Math.Int(x-image.GetWidth()/2), Math.Int(y-image.GetHeight()/2), z);
+}
+
+
+logo.original=Image("logo.png"); logo.sprite=Sprite();
+for (i=0; i<24; i++) glint[i].original=Image("glint-"+i+".png");
+light_a=Sprite(); light_b=Sprite();
+dialog.original=Image("entry.png"); dialog.sprite=Sprite();
+prompt.sprite=Sprite(); answer.sprite=Sprite(); message.sprite=Sprite();
+bullet.original=Image("bullet.png"); bullet_count=0;
+for(i=0;i<64;i++) { bullets[i]=Sprite(); bullets[i].SetOpacity(0); }
+mode="normal"; prompt_text=""; answer_text=""; message_text="";
+width=0; height=0; frame=0; quitting=0;
+# Arbitrary messages/prompts are plain text (not markup). Fit to viewport.
+fun text_image(text, error) {
+    if (error) image = Image.Text(text, 1, 180/255, 171/255, 1, "DejaVu Sans 16");
+    else image = Image.Text(text, 224/255, 226/255, 232/255, 1, "DejaVu Sans 16");
+    factor = min(scale, min(width*0.84/max(1,image.GetWidth()), height*0.12/max(1,image.GetHeight())));
+    return scaled(image, factor);
+}
+fun draw_dialog() {
+    for(i=0;i<64;i++) bullets[i].SetOpacity(0);
+    prompt.sprite.SetOpacity(0); answer.sprite.SetOpacity(0);
+    if(mode=="normal") { dialog.sprite.SetOpacity(0); return; }
+    y=height*0.78+oy;
+    place(dialog.sprite,dialog.image,cx,y,20);
+    dialog.sprite.SetOpacity(1);
+    if(mode=="password") {
+        # Raster bullets: no dependency on initramfs font glyphs.
+        # Show only the trailing window of a long password, never truncate input.
+        spacing=max(1,16*scale);
+        left=cx-dialog.image.GetWidth()/2+16*scale;
+        usable=dialog.image.GetWidth()-32*scale;
+        capacity=max(1,min(64,Math.Int((usable-bullet.image.GetWidth())/spacing)+1));
+        visible=min(bullet_count,capacity);
+        start=left+bullet.image.GetWidth()/2;
+        if(bullet_count>capacity) start=left+usable-bullet.image.GetWidth()/2-(visible-1)*spacing;
+        for(i=0;i<visible;i++) {
+            place(bullets[i],bullet.image,start+i*spacing,y,21);
+            bullets[i].SetOpacity(1);
+        }
+    } else {
+        place(prompt.sprite,text_image(prompt_text,0),cx,height*0.70+oy,21);
+        entry_image=text_image(answer_text,0);
+        entry_image=scaled(entry_image,min(1,dialog.image.GetWidth()*0.90/max(1,entry_image.GetWidth())));
+        place(answer.sprite,entry_image,cx,y,21);
+        prompt.sprite.SetOpacity(1); answer.sprite.SetOpacity(1);
+    }
+}
+fun draw_message() {
+    if (message_text == "") { message.sprite.SetOpacity(0); }
+    else {
+        # Messages include boot errors: show verbatim, never replace with fake success.
+        place(message.sprite, text_image(message_text, 1), cx, height*0.90+oy, 30);
+        message.sprite.SetOpacity(1);
+    }
+}
+
+fun layout() {
+    global.width=Window.GetWidth(); global.height=Window.GetHeight();
+    global.ox=Window.GetX(); global.oy=Window.GetY();
+    global.cx=ox+width/2; global.cy=oy+height*0.44;
+    global.scale=min(width/1920,height/1080);
+    size=Math.Int(min(width*0.42,height*0.48));
+    global.logo.image=logo.original.Scale(size,size);
+    for(i=0;i<24;i++) global.glint[i].image=glint[i].original.Scale(size,size);
+    global.dialog.image=scaled(dialog.original,scale);
+    global.bullet.image=scaled(bullet.original,scale);
+    place(logo.sprite,logo.image,cx,cy,1);
+    draw_dialog(); draw_message();
+}
+fun refresh() {
+    if(width!=Window.GetWidth() || height!=Window.GetHeight() || ox!=Window.GetX() || oy!=Window.GetY()) layout();
+    phase=frame%180;
+    light_a.SetOpacity(0); light_b.SetOpacity(0);
+    logo.sprite.SetOpacity(0.82);
+    if(phase<90 && !quitting) {
+        position=phase*23/89;
+        index=min(22,Math.Int(position)); fraction=position-index;
+        intensity=1;
+        place(light_a,glint[index].image,cx,cy,2);
+        place(light_b,glint[index+1].image,cx,cy,3);
+        light_a.SetOpacity((1-fraction)*intensity);
+        light_b.SetOpacity(fraction*intensity);
+    }
+    global.frame++;
+}
+fun normal() {
+    global.mode = "normal"; global.prompt_text = ""; global.answer_text = "";
+    draw_dialog();
+}
+fun password(prompt, count) {
+    global.mode="password"; global.prompt_text=""; global.answer_text="";
+    global.bullet_count=max(0,count);
+    draw_dialog();
+}
+fun question(prompt, entry) {
+    global.mode = "question"; global.prompt_text = prompt; global.answer_text = entry;
+    draw_dialog();
+}
+fun display_prompt(prompt, entry, secret) {
+    # New Plymouth API: immediately mask secret input; never render/store it.
+    if (secret) password(prompt, entry.Length());
+    else question(prompt, entry);
+}
+fun display_message(text) { global.message_text = text; draw_message(); }
+fun hide_message(text) {
+    if (text == message_text) { global.message_text = ""; draw_message(); }
+}
+
+fun quit() { global.quitting=1; refresh(); }
+layout(); refresh();
+Plymouth.SetRefreshFunction(refresh);
+Plymouth.SetDisplayNormalFunction(normal);
+Plymouth.SetDisplayPasswordFunction(password);
+Plymouth.SetDisplayQuestionFunction(question);
+if(Plymouth.SetDisplayPromptFunction) Plymouth.SetDisplayPromptFunction(display_prompt);
+Plymouth.SetDisplayMessageFunction(display_message);
+Plymouth.SetHideMessageFunction(hide_message);
+Plymouth.SetQuitFunction(quit);
